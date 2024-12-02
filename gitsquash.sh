@@ -42,6 +42,8 @@ while getopts "h?n:m:ae" opt; do
 	esac
 done
 
+EDIT=$([ "$EDIT" = true ] && echo "--edit")
+
 shift $(($OPTIND - 1))
 if [ $# -gt 0 ]; then
 	echo "$USAGE"
@@ -49,17 +51,17 @@ if [ $# -gt 0 ]; then
 fi
 
 # Reference Nth previous commmit
-OLD_REF="HEAD~${NUM}"
+OLD_REF="HEAD~$((NUM-1))"
 
 # Extract commit message/s from git log if not given
 if [ "$MSG" = "" ]; then
 	if [ "$ALL" = true ]; then
 		NEW_REF="HEAD"
 	else
-		NEW_REF="HEAD~$((NUM-1))"
+		NEW_REF="${OLD_REF}"
 	fi
 	
-	MSG=$(git log --format=%s%b ${OLD_REF}..${NEW_REF})
+	MSG=$(git log --format=%s%b ${OLD_REF}^! ${NEW_REF})
 	if [ $? -ne 0 ]; then
 		exit 2 # git error
 	fi
@@ -67,7 +69,7 @@ fi
 
 # Display commits to be squashed
 echo "Squashing ${NUM} commits:"
-git log --format="${LOG_FORMAT}" "${OLD_REF}..HEAD"
+git log --format="${LOG_FORMAT}" "${OLD_REF}^!" "HEAD"
 if [ $? -ne 0 ]; then
 	exit 2 # git error
 fi
@@ -75,9 +77,17 @@ fi
 # Record HEAD commit hash to rollback
 HEAD_REF="$(git log --format=%H -1)"
 
-# Reset to Nth previous commit and recommit subsequent changes
-EDIT=$([ "$EDIT" = true ] && echo "--edit")
-git reset --soft "${OLD_REF}" && git commit ${EDIT} -m "${MSG}"
+# Check whether OLD_REF has a parent
+git rev-parse --verify "${OLD_REF}~" &>/dev/null
+if [ $? -eq 0 ]; then
+	# Reset to OLD_REF parent and recommit subsequent changes
+	git reset --soft "${OLD_REF}~" && git commit ${EDIT} -m "${MSG}"
+else
+	# OLD_REF has no parent so dereference HEAD and recommit all changes
+	git update-ref -d HEAD && git commit ${EDIT} -m "${MSG}"
+fi
+
+# Rollback on reset & recommit failure
 if [ $? -ne 0 ]; then
 	echo "Cannot squash commits, rolling back..."
 	git reset --hard "${HEAD_REF}"
