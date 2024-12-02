@@ -1,7 +1,7 @@
 #!/bin/bash 
 # (c) Tim Peugniez 2021
 
-USASE=$(cat <<-END
+USAGE=$(cat << END
 Usage: $(basename $0) [-n <count>] [-m <message>] [-a] [-e]
   -n	Squash the last <count> commits (default is 2) 
   -m	Use the given commit <message> (overrides the -a option) 
@@ -24,7 +24,7 @@ EDIT=false
 while getopts "h?n:m:ae" opt; do
 	case "$opt" in
 	h|\?)
-		echo "$USAGE"
+		echo "${USAGE}"
 		exit 0
 		;;
 	n)	NUM=$OPTARG
@@ -46,7 +46,7 @@ EDIT=$([ "$EDIT" = true ] && echo "--edit")
 
 shift $(($OPTIND - 1))
 if [ $# -gt 0 ]; then
-	echo "$USAGE"
+	echo "${USAGE}"
 	exit 1
 fi
 
